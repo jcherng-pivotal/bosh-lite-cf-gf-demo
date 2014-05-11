@@ -14,19 +14,27 @@ set +x
 ## Dependency locations
 ##
 BOSH_LITE_REPO=${BOSH_LITE_REPO:-https://github.com/cloudfoundry/bosh-lite.git}
-RELEASE_VERSION=${RELEASE_VERSION:-154}
-RELEASE_TGZ_URL=${RELEASE_TGZ:-https://github.com/cloudfoundry/cf-release/archive/v$RELEASE_VERSION.tar.gz}
+CF_RELEASE_VERSION=${CF_RELEASE_VERSION:-164}
+CF_RELEASE_TGZ_URL=${CF_RELEASE_TGZ:-https://github.com/cloudfoundry/cf-release/archive/v$CF_RELEASE_VERSION.tar.gz}
 STEMCELL_NAME=${STEMCELL_NAME:-bosh-stemcell-24-warden-boshlite-ubuntu.tgz}
+
+GEMFIRE_BOSH_RELEASE_REPO=${GEMFIRE_BOSH_RELEASE_REPO:-https://github.com/jcherng-pivotal/gemfire-bosh-release.git}
 
 APPLICATION_URL=${APPLICATION_URL:-https://github.com/cloudfoundry-community/cf-env.git}
 APPLICATION_NAME=${APPLICATION_NAME:-cf-env}
 
 WORKSPACE_DIR=${WORKSPACE_DIR:-$HOME/bosh-lite-tutorial}
-PROJECT_NAME=cf-release
-RELEASE_NAME=cf
-RELEASE_DIR=$WORKSPACE_DIR/$PROJECT_NAME-$RELEASE_VERSION
-SOURCE_RELEASE_TGZ=$WORKSPACE_DIR/$PROJECT_NAME-v$RELEASE_VERSION.tar.gz
-FINAL_RELEASE_TGZ=$RELEASE_DIR/releases/$RELEASE_NAME-$RELEASE_VERSION.tgz
+CF_PROJECT_NAME=cf-release
+CF_RELEASE_NAME=cf
+CF_RELEASE_DIR=$WORKSPACE_DIR/$CF_PROJECT_NAME-$CF_RELEASE_VERSION
+CF_SOURCE_RELEASE_TGZ=$WORKSPACE_DIR/$CF_PROJECT_NAME-v$CF_RELEASE_VERSION.tar.gz
+CF_FINAL_RELEASE_TGZ=$RELEASE_DIR/releases/$CF_RELEASE_NAME-$CF_RELEASE_VERSION.tgz
+
+GEMFIRE_PROJECT_NAME=gemfire-bosh-release
+GEMFIRE_RELEASE_NAME=cf-gemfire
+GEMFIRE_RELEASE_DIR=$WORKSPACE_DIR/$GEMFIRE_PROJECT_NAME-$GEMFIRE_RELEASE_VERSION
+GEMFIRE_SOURCE_RELEASE_TGZ=$WORKSPACE_DIR/$GEMFIRE_PROJECT_NAME-v$GEMFIRE_RELEASE_VERSION.tar.gz
+GEMFIRE_FINAL_RELEASE_TGZ=$RELEASE_DIR/releases/$GEMFIRE_RELEASE_NAME-$GEMFIRE_RELEASE_VERSION.tgz
 
 ##
 ## Verify local requirements
@@ -57,8 +65,8 @@ if [[ "${SKIP_VERIFY}X" == "X" ]]; then
     spiff --version
 
     echo
-    cf_installed=$(which gcf)
-    gcf --version
+    cf_installed=$(which cf)
+    cf --version
 
     echo
     if [[ "${ruby_installed}X" == "X" || "${vagrant_installed}X" == "X" || "${git_installed}X" == "X" || "${wget_installed}" == "X" || "${spiff_installed}X" == "X" || "${cf_installed}X" == "X" ]]; then
@@ -74,7 +82,7 @@ if [[ "${SKIP_VERIFY}X" == "X" ]]; then
             echo spiff   - https://github.com/cloudfoundry-incubator/spiff/releases
         fi
         if [[ "${cf_installed}X" == "X" ]]; then
-            echo gcf     - https://github.com/cloudfoundry/cli#downloading-edge
+            echo cf     - https://github.com/cloudfoundry/cli#installers
         fi
         exit 1
     fi
@@ -100,18 +108,18 @@ if [[ ! -f Gemfile ]]; then
     echo "source 'https://rubygems.org'; gem 'bosh_cli'" > Gemfile
     bundle install
 fi
-if [[ ! -f $SOURCE_RELEASE_TGZ ]]; then
-    wget $RELEASE_TGZ_URL -O $SOURCE_RELEASE_TGZ
+if [[ ! -f $CF_SOURCE_RELEASE_TGZ ]]; then
+    wget $CF_RELEASE_TGZ_URL -O $CF_SOURCE_RELEASE_TGZ
 fi
-if [[ ! -d $RELEASE_DIR ]]; then
-    tar xfz $SOURCE_RELEASE_TGZ
-    cd $RELEASE_DIR
+if [[ ! -d $CF_RELEASE_DIR ]]; then
+    tar xfz $CF_SOURCE_RELEASE_TGZ
+    cd $CF_RELEASE_DIR
     bundle install
 fi
-if [[ ! -f $FINAL_RELEASE_TGZ ]]; then
-    cd $RELEASE_DIR
+if [[ ! -f $CF_FINAL_RELEASE_TGZ ]]; then
+    cd $CF_RELEASE_DIR
     rm -f Gemfile*
-    bundle exec bosh create release --force --with-tarball releases/cf-$RELEASE_VERSION.yml
+    bundle exec bosh create release --force --with-tarball releases/cf-$CF_RELEASE_VERSION.yml
 fi
 cd $WORKSPACE_DIR
 
@@ -135,19 +143,15 @@ if [[ "${NO_REBUILD}X" == "X" ]]; then
 fi
 vagrant up
 
-
 set +e # do not exit on error; allow these to fail if already performed
 yes admin | bosh target https://192.168.50.4:25555
-bosh upload release $FINAL_RELEASE_TGZ
+bosh upload release $CF_FINAL_RELEASE_TGZ
 bosh upload stemcell $WORKSPACE_DIR/$STEMCELL_NAME
 set -e # exit on error
 
 # specifically for cf-release/bosh-lite need to setup $CF_RELEASE_DIR
-export CF_RELEASE_DIR=${RELEASE_DIR}
+#export CF_RELEASE_DIR=${RELEASE_DIR}
 scripts/make_manifest_spiff
-
-# Parallelise the deployment!
-echo "  serial: false" >> manifests/cf-manifest.yml
 
 ##
 ## Deploy Cloud Foundry into our BOSH (bosh-lite)
@@ -164,14 +168,29 @@ bosh vms
 cd $WORKSPACE_DIR/bosh-lite
 ./scripts/add-route # to access 10.244.0.34 via host machine
 
-gcf api https://api.10.244.0.34.xip.io
-gcf auth admin admin
+cf api --skip-ssl-validation https://api.10.244.0.34.xip.io
+cf auth admin admin
 
-gcf create-org me
-gcf target -o me
+cf create-org me
+cf target -o me
 
-gcf create-space test
-gcf target -s test
+cf create-space test
+cf target -s test
+
+##
+## Deploy GemFire into our BOSH (bosh-lite)
+##
+cd $WORKSPACE_DIR
+
+if [[ ! -d gemfire-bosh-release ]]; then
+    git clone -b pivotal-gemfire-bosh-release $GEMFIRE_BOSH_RELEASE_REPO gemfire-bosh-release
+fi
+cp -r $WORKSPACE_DIR/blobs/ $WORKSPACE_DIR/gemfire-bosh-release/blobs/
+cd $WORKSPACE_DIR/gemfire-bosh-release
+bosh create release --force
+bosh upload release
+bosh deployment gemfire-bosh-lite.yml
+bosh -n deploy
 
 ##
 ## Deploy example application
@@ -184,6 +203,6 @@ if [[ ! -d $APPLICATION_NAME ]]; then
 fi
 cd $APPLICATION_NAME
 bundle
-gcf push $APPLICATION_NAME
+cf push $APPLICATION_NAME
 
-gcf apps
+cf apps
