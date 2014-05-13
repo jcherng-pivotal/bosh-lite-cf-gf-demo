@@ -1,0 +1,264 @@
+#!/usr/bin/env bash
+
+##
+## This script boots up bosh-lite in a local Vagrant/Virtualbox VM,
+## then uploads and deploys Cloud Foundry into it.
+## Finally, it logs into Cloud Foundry as an admin user,
+## creates an initial organization and space,
+## then deploys an example application.
+##
+
+set +x
+
+##
+## Dependency locations
+##
+
+SCRIPT_PATH=${SCRIPT_PATH:-$( cd $(dirname $0) ; pwd -P )}
+BLOB_PATH=${BLOB_PATH:-$SCRIPT_PATH/../blobs}
+
+BOSH_LITE_REPO=${BOSH_LITE_REPO:-https://github.com/cloudfoundry/bosh-lite.git}
+CF_RELEASE_REPO=${CF_RELEASE_REPO:-https://github.com/cloudfoundry/cf-release.git}
+CF_BROKERS_REPO=${CF_BROKERS_REPO:-https://github.com/jcherng-pivotal/cloudfoundry-brokers.git}
+GF_BOSH_RELEASE_REPO=${GEMFIRE_BOSH_RELEASE_REPO:-https://github.com/jcherng-pivotal/gemfire-bosh-release.git}
+GF_SERVICE_BROKER_REPO=${GEMFIRE_BOSH_RELEASE_REPO:-https://github.com/jcherng-pivotal/cloudfoundry-brokers.git}
+
+STEMCELL_NAME=${STEMCELL_NAME:-bosh-stemcell-24-warden-boshlite-ubuntu.tgz}
+
+WORKSPACE_DIR=${WORKSPACE_DIR:-$HOME/bosh-lite-tutorial}
+CF_PROJECT_NAME=cf-release
+CF_RELEASE_NAME=cf
+CF_RELEASE_DIR=$WORKSPACE_DIR/$CF_PROJECT_NAME
+CF_RELEASE_VERSION=${CF_RELEASE_VERSION:-164}
+CF_FINAL_RELEASE_TGZ=$CF_RELEASE_DIR/releases/$CF_RELEASE_NAME-$CF_RELEASE_VERSION.tgz
+
+GF_BOSH_PROJECT_NAME=gemfire-bosh-release
+GF_BOSH_RELEASE_NAME=cf-gemfire
+GF_BOSH_RELEASE_DIR=$WORKSPACE_DIR/$GF_BOSH_PROJECT_NAME
+GF_BOSH_DEV_RELEASE_VERSION=${GF_BOSH_RELEASE_VERSION:-0.1-dev}
+GF_BOSH_DEV_RELEASE_TGZ=$GF_BOSH_RELEASE_DIR/dev_releases/$GF_BOSH_RELEASE_NAME-$GF_BOSH_DEV_RELEASE_VERSION.tgz
+
+GF_SERVICE_BROKER_PROJECT_NAME=cloudfoundry-brokers
+GF_SERVICE_BROKER_DIR=$WORKSPACE_DIR/$GF_SERVICE_BROKER_PROJECT_NAME
+GF_SERVICE_BROKER_TGZ=$GF_SERVICE_BROKER_DIR/target/cf-brokers.tar.gz
+
+APP_REPO=${APPLICATION_URL:-https://github.com/cloudfoundry-community/cf-env.git}
+APP_NAME=${APPLICATION_NAME:-cf-env}
+
+GF_APP_REPO=${APPLICATION_URL:-https://github.com/bijukunjummen/sample-pso-cf-app.git}
+GF_APP_NAME=${APPLICATION_NAME:-sample-pso-cf-app}
+
+
+##
+## Verify local requirements
+##
+if [[ "${SKIP_VERIFY}X" == "X" ]]; then
+    set +e
+
+    echo Required dependencies: ruby 1.9.3, vagrant 1.4+, git 1.7+, wget, spiff 0.3+, gcf 6.0+, maven 3.0+
+    echo
+
+    ruby_installed=$(which ruby)
+    ruby -v
+
+    echo
+    vagrant_installed=$(which vagrant)
+    vagrant -v
+
+    echo
+    git_installed=$(which git)
+    git --version
+
+    echo
+    wget_installed=$(which wget)
+    wget --version | head -n1
+
+    echo
+    spiff_installed=$(which spiff)
+    spiff --version
+
+    echo
+    cf_installed=$(which cf)
+    cf --version
+    
+    echo
+    mvn_installed=$(which mvn)
+    mvn --version
+
+    echo
+    if [[ "${ruby_installed}X" == "X" || "${vagrant_installed}X" == "X" || "${git_installed}X" == "X" || "${wget_installed}" == "X" || "${spiff_installed}X" == "X" || "${cf_installed}X" == "X" || "${mvn_installed}X" == "X" ]]; then
+        echo Please install the missing dependencies above.
+        echo
+        if [[ "${ruby_installed}X" == "X" ]]; then
+            echo ruby    - http://rvm.io
+        fi
+        if [[ "${vagrant_installed}X" == "X" ]]; then
+            echo vagrant - http://www.vagrantup.com/downloads.html
+        fi
+        if [[ "${spiff_installed}X" == "X" ]]; then
+            echo spiff   - https://github.com/cloudfoundry-incubator/spiff/releases
+        fi
+        if [[ "${cf_installed}X" == "X" ]]; then
+            echo cf     - https://github.com/cloudfoundry/cli#installers
+        fi
+        if [[ "${mvn_installed}X" == "X" ]]; then
+            echo mvn     - http://maven.apache.org/download.cgi
+        fi
+        exit 1
+    fi
+    echo Press [ENTER] if your versions are ok, else Ctrl-C to cancel and manually install them.
+    read
+
+    ##
+    ## Workspace setup
+    ##
+
+    echo Will use $WORKSPACE_DIR for this demo. Press [ENTER] or re-run with \$WORKSPACE_DIR set.
+    read
+fi
+
+set -e # exit on error
+set -x # show commands being run
+
+mkdir -p $WORKSPACE_DIR
+cd $WORKSPACE_DIR
+if [[ ! -f Gemfile ]]; then
+    echo "source 'https://rubygems.org'; gem 'bosh_cli'" > Gemfile
+    bundle install
+fi
+if [[ ! -d $CF_RELEASE_DIR ]]; then
+    set -x
+    git clone $CF_RELEASE_REPO $CF_PROJECT_NAME
+    cd $CF_RELEASE_DIR
+    bundle install
+    set +x
+fi
+if [[ ! -f $CF_FINAL_RELEASE_TGZ ]]; then
+    cd $CF_RELEASE_DIR
+    rm -f Gemfile*
+    ./update
+    git checkout v$CF_RELEASE_VERSION
+    bundle exec bosh create release --force --with-tarball $CF_RELEASE_DIR/releases/$CF_RELEASE_NAME-$CF_RELEASE_VERSION.yml
+fi
+cd $WORKSPACE_DIR
+if [[ ! -d $GF_BOSH_RELEASE_DIR ]]; then
+    set -x
+    git clone -b pivotal-gemfire-bosh-release $GF_BOSH_RELEASE_REPO $GF_BOSH_PROJECT_NAME
+    cd $GF_BOSH_RELEASE_DIR
+    bundle install
+    cp -a $BLOB_PATH $GF_BOSH_RELEASE_DIR/blobs
+    set +x
+fi
+cd $WORKSPACE_DIR
+if [[ ! -d $GF_SERVICE_BROKER_DIR ]]; then
+    git clone $GF_SERVICE_BROKER_REPO $GF_SERVICE_BROKER_PROJECT_NAME
+fi
+if [[ ! -f $GF_SERVICE_BROKER_TGZ ]]; then
+    cd $GF_SERVICE_BROKER_DIR
+    mvn clean package
+fi
+if [[ ! -f $GF_BOSH_DEV_RELEASE_TGZ ]]; then
+    cd $GF_BOSH_RELEASE_DIR
+    cp $GF_SERVICE_BROKER_TGZ $GF_BOSH_RELEASE_DIR/blobs/gemfire
+    rm -f Gemfile*
+    bundle exec bosh create release --force --with-tarball $GF_BOSH_RELEASE_DIR/dev_releases/$GF_BOSH_RELEASE_NAME-$GF_BOSH_DEV_RELEASE_VERSION.yml
+fi
+
+
+cd $WORKSPACE_DIR
+if [[ ! -d bosh-lite ]]; then
+    set -x
+    git clone $BOSH_LITE_REPO bosh-lite
+    cd bosh-lite
+    rm -f Gemfile*
+    set +x
+fi
+
+cd $WORKSPACE_DIR
+if [[ ! -f $STEMCELL_NAME ]]; then
+    bundle exec bosh download public stemcell $STEMCELL_NAME
+fi
+
+cd $WORKSPACE_DIR/bosh-lite
+
+if [[ "${NO_REBUILD}X" == "X" ]]; then
+    vagrant destroy -f
+fi
+vagrant up
+
+set +e # do not exit on error; allow these to fail if already performed
+yes admin | bosh target https://192.168.50.4:25555
+bosh upload release $CF_FINAL_RELEASE_TGZ
+bosh upload release $GF_BOSH_DEV_RELEASE_TGZ
+bosh upload stemcell $WORKSPACE_DIR/$STEMCELL_NAME
+set -e # exit on error
+
+# specifically for cf-release/bosh-lite need to setup $CF_RELEASE_DIR
+export CF_RELEASE_DIR=${CF_RELEASE_DIR}
+./scripts/make_manifest_spiff
+
+##
+## Deploy Cloud Foundry into our BOSH (bosh-lite)
+## 
+bosh -n deploy
+
+bosh status
+bosh vms
+
+bosh deployment $GF_BOSH_RELEASE_DIR/gemfire-bosh-lite.yml
+bosh status
+
+bosh -n deploy
+
+bosh status
+bosh vms
+
+##
+## Setup Cloud Foundry
+##
+
+cd $WORKSPACE_DIR/bosh-lite
+./scripts/add-route # to access 10.244.0.34 via host machine
+
+cf api --skip-ssl-validation https://api.10.244.0.34.xip.io
+cf auth admin admin
+
+cf create-org me
+cf target -o me
+
+cf create-space test
+cf target -s test
+
+##
+## Deploy example application
+##
+
+cd $WORKSPACE_DIR
+
+if [[ ! -d $APP_NAME ]]; then
+    git clone $APP_REPO $APP_NAME
+fi
+cd $APP_NAME
+bundle
+cf push $APP_NAME
+
+##
+## Deploy GemFire CF example application
+##
+
+cd $WORKSPACE_DIR
+
+if [[ ! -d $GF_APP_NAME ]]; then
+    git clone $GF_APP_REPO $GF_APP_NAME
+fi
+cd $GF_APP_NAME
+mvn clean package
+cd target
+cf push $GF_APP_NAME -p $GF_APP_NAME-1.0.0-SNAPSHOT.war
+
+cf apps
+
+bosh status
+bosh releases
+bosh deployments
+bosh vms

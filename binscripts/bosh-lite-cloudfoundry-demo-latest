@@ -14,9 +14,10 @@ set +x
 ## Dependency locations
 ##
 BOSH_LITE_REPO=${BOSH_LITE_REPO:-https://github.com/cloudfoundry/bosh-lite.git}
+CF_RELEASE_REPO=${CF_RELEASE_REPO:-https://github.com/cloudfoundry/cf-release.git}
 CF_RELEASE_VERSION=${CF_RELEASE_VERSION:-164}
 CF_RELEASE_TGZ_URL=${CF_RELEASE_TGZ:-https://github.com/cloudfoundry/cf-release/archive/v$CF_RELEASE_VERSION.tar.gz}
-STEMCELL_NAME=${STEMCELL_NAME:-bosh-stemcell-24-warden-boshlite-ubuntu.tgz}
+STEMCELL_NAME=${STEMCELL_NAME:-latest-bosh-stemcell-warden.tgz}
 
 GEMFIRE_BOSH_RELEASE_REPO=${GEMFIRE_BOSH_RELEASE_REPO:-https://github.com/jcherng-pivotal/gemfire-bosh-release.git}
 
@@ -108,21 +109,30 @@ if [[ ! -f Gemfile ]]; then
     echo "source 'https://rubygems.org'; gem 'bosh_cli'" > Gemfile
     bundle install
 fi
-if [[ ! -f $CF_SOURCE_RELEASE_TGZ ]]; then
-    wget $CF_RELEASE_TGZ_URL -O $CF_SOURCE_RELEASE_TGZ
-fi
-if [[ ! -d $CF_RELEASE_DIR ]]; then
-    tar xfz $CF_SOURCE_RELEASE_TGZ
-    cd $CF_RELEASE_DIR
-    bundle install
-fi
-if [[ ! -f $CF_FINAL_RELEASE_TGZ ]]; then
-    cd $CF_RELEASE_DIR
-    rm -f Gemfile*
-    bundle exec bosh create release --force --with-tarball releases/cf-$CF_RELEASE_VERSION.yml
-fi
-cd $WORKSPACE_DIR
+#if [[ ! -f $CF_SOURCE_RELEASE_TGZ ]]; then
+#    wget $CF_RELEASE_TGZ_URL -O $CF_SOURCE_RELEASE_TGZ
+#fi
+#if [[ ! -d $CF_RELEASE_DIR ]]; then
+#    tar xfz $CF_SOURCE_RELEASE_TGZ
+#    cd $CF_RELEASE_DIR
+#    bundle install
+#fi
+#if [[ ! -f $CF_FINAL_RELEASE_TGZ ]]; then
+#    cd $CF_RELEASE_DIR
+#    rm -f Gemfile*
+#    bundle exec bosh create release --force --with-tarball releases/cf-$CF_RELEASE_VERSION.yml
+#fi
 
+cd $WORKSPACE_DIR
+if [[ ! -d cf-release ]]; then
+    set -x
+    git clone $CF_RELEASE_REPO cf-release
+    cd cf-release
+    rm -f Gemfile*
+    set +x
+fi
+
+cd $WORKSPACE_DIR
 if [[ ! -d bosh-lite ]]; then
     set -x
     git clone $BOSH_LITE_REPO bosh-lite
@@ -133,11 +143,10 @@ fi
 
 cd $WORKSPACE_DIR
 if [[ ! -f $STEMCELL_NAME ]]; then
-    bundle exec bosh download public stemcell $STEMCELL_NAME
+    wget http://bosh-jenkins-gems-warden.s3.amazonaws.com/stemcells/$STEMCELL_NAME
 fi
 
 cd $WORKSPACE_DIR/bosh-lite
-
 if [[ "${NO_REBUILD}X" == "X" ]]; then
     vagrant destroy -f
 fi
@@ -145,19 +154,17 @@ vagrant up
 
 set +e # do not exit on error; allow these to fail if already performed
 yes admin | bosh target https://192.168.50.4:25555
-bosh upload release $CF_FINAL_RELEASE_TGZ
-bosh upload stemcell $WORKSPACE_DIR/$STEMCELL_NAME
+#bosh upload release $CF_FINAL_RELEASE_TGZ
+bosh upload stemcell $WORKSPACE_DIR/bosh-lite/$STEMCELL_NAME --skip-if-exists
 set -e # exit on error
 
 # specifically for cf-release/bosh-lite need to setup $CF_RELEASE_DIR
-export CF_RELEASE_DIR=${CF_RELEASE_DIR}
-scripts/make_manifest_spiff
+#export CF_RELEASE_DIR=${CF_RELEASE_DIR}
+./scripts/provision_cf
 
 ##
 ## Deploy Cloud Foundry into our BOSH (bosh-lite)
 ## 
-bosh -n deploy
-
 bosh status
 bosh vms
 
