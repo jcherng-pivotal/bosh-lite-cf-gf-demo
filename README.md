@@ -44,15 +44,15 @@ There are a number of open source BOSH release projects for running open source 
 During this script, approximately 2.5G of content is downloaded (Vagrant box, Cloud Foundry source & dependencies, Warden image/stemcell). Also, the first time you run the installer (it can be re-run over and over to upgrade and rebuild), it will compile the source packages of Cloud Foundry one time. If you re-run the script below, these assets will not be downloaded again.
 
 1. Clone a copy of bosh-lite-cf-gf-demo:
-```
-cd ~/workspace
-git clone https://github.com/jcherng-pivotal/bosh-lite-cf-gf-demo
-```
+  ```
+  cd ~/workspace
+  git clone https://github.com/jcherng-pivotal/bosh-lite-cf-gf-demo
+  ```
 
 2. Run the bosh-lite-cf-gf-demo script:
-```
-./bosh-lite-cf-gf-demo/binscripts/bosh-lite-cf-gf-demo
-```
+  ```
+  ./bosh-lite-cf-gf-demo/binscripts/bosh-lite-cf-gf-demo
+  ```
 
 You may you want to [read through the scripts](https://github.com/jcherng-pivotal/bosh-lite-cf-gf-demo/tree/master/binscripts) first.
 
@@ -76,13 +76,15 @@ To deploy Cloud Foundry and then talk to Cloud Foundry as an administrator/user:
 * cf - Cloud Foundry's own CLI for users and admins
 
 The installer script also uses the following to compile sample applications:
+
 * maven
 
-The is project has dependencies on third party licensed binary files. You will have to download the following files seperately.
-  * [jdk7 - Linux 64 tgz version](http://www.oracle.com/technetwork/java/javase/downloads/jdk7-downloads-1880260.html)
-  Rename the tgz file to jdk-7-linux-x64.tar.gz and place it under [bosh-lite-cf-gf-demo/blobs/java](https://github.com/jcherng-pivotal/bosh-lite-cf-gf-demo/tree/master/blobs/java)
-  * [Pivotal GemFire](https://network.gopivotal.com/products/pivotal-gemfire)
-  Rename the zip file to Pivotal_GemFire_7.zip and place it under [bosh-lite-cf-gf-demo/blobs/gemfire](https://github.com/jcherng-pivotal/bosh-lite-cf-gf-demo/tree/master/blobs/gemfire)
+The is project has dependencies on third party licensed binary files. You will have to download the following files seperately:
+
+* [jdk7 - Linux 64 tgz version](http://www.oracle.com/technetwork/java/javase/downloads/jdk7-downloads-1880260.html)
+   - Rename the tgz file to jdk-7-linux-x64.tar.gz and place it under [bosh-lite-cf-gf-demo/blobs/java](https://github.com/jcherng-pivotal/bosh-lite-cf-gf-demo/tree/master/blobs/java)
+* [Pivotal GemFire](https://network.gopivotal.com/products/pivotal-gemfire)
+   - Rename the zip file to Pivotal_GemFire_7.zip and place it under [bosh-lite-cf-gf-demo/blobs/gemfire](https://github.com/jcherng-pivotal/bosh-lite-cf-gf-demo/tree/master/blobs/gemfire)
 
 The installer script will test for the existence of these requirements. It's currently not clever enough to check for versions, so you will be prompted to confirm you have the right versions.
 
