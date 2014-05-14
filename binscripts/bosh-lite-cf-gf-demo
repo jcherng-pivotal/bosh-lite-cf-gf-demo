@@ -48,6 +48,8 @@ APP_NAME=${APPLICATION_NAME:-cf-env}
 GF_APP_REPO=${APPLICATION_URL:-https://github.com/bijukunjummen/sample-pso-cf-app.git}
 GF_APP_NAME=${APPLICATION_NAME:-sample-pso-cf-app}
 
+GF_SERVICE_NAME=pivotal-gemfire-1
+
 
 ##
 ## Verify local requirements
@@ -143,7 +145,7 @@ fi
 cd $WORKSPACE_DIR
 if [[ ! -d $GF_BOSH_RELEASE_DIR ]]; then
     set -x
-    git clone -b pivotal-gemfire-bosh-release $GF_BOSH_RELEASE_REPO $GF_BOSH_PROJECT_NAME
+    git clone $GF_BOSH_RELEASE_REPO $GF_BOSH_PROJECT_NAME
     cd $GF_BOSH_RELEASE_DIR
     bundle install
     cp -a $BLOB_PATH $GF_BOSH_RELEASE_DIR/blobs
@@ -230,6 +232,19 @@ cf create-space test
 cf target -s test
 
 ##
+## Create GemFire service broker and GemFire service
+##
+
+cf create-service-broker gemfire admin admin http://10.244.0.102:8888
+GUID=$(cf curl /v2/service_plans -X 'GET' | grep '"guid":' | sed 's/\"guid": //' | tr -d ' ",')
+cf curl /v2/service_plans/$GUID -X 'PUT' -d '{"public":true}'
+
+cf create-service pivotal-gemfire 1GB-replicated pivotal-gemfire-1
+cf curl /v2/service_plans/$GUID -X 'GET'
+
+
+
+##
 ## Deploy example application
 ##
 
@@ -240,7 +255,9 @@ if [[ ! -d $APP_NAME ]]; then
 fi
 cd $APP_NAME
 bundle
-cf push $APP_NAME
+cf push $APP_NAME --no-start
+cf bind-service $APP_NAME $GF_SERVICE_NAME
+cf push
 
 ##
 ## Deploy GemFire CF example application
@@ -254,7 +271,9 @@ fi
 cd $GF_APP_NAME
 mvn clean package
 cd target
-cf push $GF_APP_NAME -p $GF_APP_NAME-1.0.0-SNAPSHOT.war
+cf push $GF_APP_NAME -p $GF_APP_NAME-1.0.0-SNAPSHOT.war --no-start
+cf bind-service $GF_APP_NAME $GF_SERVICE_NAME
+cf push $GF_APP_NAME -p $GF_APP_NAME-1.0.0-SNAPSHOT.war -b https://github.com/jcherng-pivotal/java-buildpack
 
 cf apps
 
