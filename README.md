@@ -21,7 +21,7 @@ Sections:
 
 **Can I use bosh-lite on my Windows machine?** Ah, no, not afaik. Even though Vagrant/Virtualbox can run on Windows; it is the current BOSH CLI that may not work on a Windows machine.
 
-**What is this project?** The purpose of this project is to give you a Quick Start to running bosh-lite on your local machine, and then introducing you to the concepts of BOSH. Everything you can do on bosh-lite, every BOSH release you can deploy, can then be used on your favourite infrastructure.
+**What is this project?** The purpose of this project is to give you a Quick Start to running bosh-lite on your local machine, and then introducing you to the concepts of BOSH. Everything you can do on bosh-lite, every BOSH release you can deploy, can then be used on your favourite infrastructure. This project will deploy [cf-release](https://github.com/cloudfoundry/cf-release) and [gemfire-bosh-release](https://github.com/jcherng-pivotal/gemfire-bosh-release) to the bosh-lite. In addition, [gemfire service broker](https://github.com/jcherng-pivotal/cloudfoundry-brokers) and a gemfire service will be created. Finally, two applications binded with the gemfire service will be deployed to the Cloud Foundry running on your local bosh-lite.
 
 **Explain it again. What is BOSH and what is bosh-lite?** bosh-lite runs within Vagrant and when it provisions "vms" (aka virtual machines/servers/machines) it is actually provisioning Linux containers (via the Warden project, similar to the Docker project). BOSH is the production version and is configured to provision "vms" on a single target infrastructure.
 
@@ -41,13 +41,20 @@ There are a number of open source BOSH release projects for running open source 
 
 ## Quick Start
 
-During this script, approximately 2G of content is downloaded (Vagrant box, Cloud Foundry source & dependencies, Warden image/stemcell). Also, the first time you run the installer (it can be re-run over and over to upgrade and rebuild), it will compile the source packages of Cloud Foundry one time. If you re-run the script below, these assets will not be downloaded again.
+During this script, approximately 2.5G of content is downloaded (Vagrant box, Cloud Foundry source & dependencies, Warden image/stemcell). Also, the first time you run the installer (it can be re-run over and over to upgrade and rebuild), it will compile the source packages of Cloud Foundry one time. If you re-run the script below, these assets will not be downloaded again.
 
+1. Clone a copy of bosh-lite-cf-gf-demo:
 ```
-curl https://raw2.github.com/cloudfoundry-community/bosh-lite-demo/master/binscripts/bosh-lite-cloudfoundry-demo | bash
+cd ~/workspace
+git clone https://github.com/jcherng-pivotal/bosh-lite-cf-gf-demo
 ```
 
-You may you want to [read through this script](https://github.com/cloudfoundry-community/bosh-lite-demo/blob/master/binscripts/bosh-lite-cloudfoundry-demo) first.
+2. Run the bosh-lite-cf-gf-demo script:
+```
+./bosh-lite-cf-gf-demo/binscripts/bosh-lite-cf-gf-demo
+```
+
+You may you want to [read through the scripts](https://github.com/jcherng-pivotal/bosh-lite-cf-gf-demo/tree/master/binscripts) first.
 
 If the script ever fails, re-run it and it will skip over any steps that were already successfully.
 
@@ -61,17 +68,27 @@ For bosh-lite to boot up, it has the following requirements:
 The installer script uses the following to get some assets:
 
 * wget
+* git
 
 To deploy Cloud Foundry and then talk to Cloud Foundry as an administrator/user:
 
 * spiff - used to construct a large YAML file used to deploy BOSH releases
-* gcf - Cloud Foundry's own CLI for users and admins
+* cf - Cloud Foundry's own CLI for users and admins
+
+The installer script also uses the following to compile sample applications:
+* maven
+
+The is project has dependencies on third party licensed binary files. You will have to download the following files seperately.
+  * [jdk7 - Linux 64 tgz version](http://www.oracle.com/technetwork/java/javase/downloads/jdk7-downloads-1880260.html)
+  Rename the tgz file to jdk-7-linux-x64.tar.gz and place it under [bosh-lite-cf-gf-demo/blobs/java](https://github.com/jcherng-pivotal/bosh-lite-cf-gf-demo/tree/master/blobs/java)
+  * [Pivotal GemFire](https://network.gopivotal.com/products/pivotal-gemfire)
+  Rename the zip file to Pivotal_GemFire_7.zip and place it under [bosh-lite-cf-gf-demo/blobs/gemfire](https://github.com/jcherng-pivotal/bosh-lite-cf-gf-demo/tree/master/blobs/gemfire)
 
 The installer script will test for the existence of these requirements. It's currently not clever enough to check for versions, so you will be prompted to confirm you have the right versions.
 
 ## Concepts
 
-The Quick Start will take a while. Or a long time if you have slow internet, downloading the 2G of bits and bobs.
+The Quick Start will take a while. Or a long time if you have slow internet, downloading the 2.5G of bits and bobs.
 
 Let's learn something about BOSH.
 
