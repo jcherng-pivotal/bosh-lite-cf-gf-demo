@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+set -e # exit on error
+set -x # show commands being run
+
+##
+## Deploy Cloud Foundry and GemFire into BOSH (bosh-lite)
+##
+echo deploy Cloud Foundry and GemFire to bosh-lite ...
+echo
+
+# specifically for cf-release/bosh-lite need to setup $CF_RELEASE_DIR
+export CF_RELEASE_DIR=${CF_RELEASE_DIR}
+./scripts/make_manifest_spiff
+bosh -n deploy
+
+bosh deployment $GF_BOSH_RELEASE_DIR/gemfire-bosh-lite.yml
+bosh -n deploy
+
+bosh status
+bosh vms

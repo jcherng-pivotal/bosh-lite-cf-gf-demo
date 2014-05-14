@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+
+set -e # exit on error
+set -x # show commands being run
+
+##
+## Deploy application with GemFire session enabled buildpack,
+## also bind the application with Pivotal GemFire service.
+##
+echo push application - $GF_APP_NAME and bind with GemFire session enabled buildpack ...
+echo
+
+cd $WORKSPACE_DIR
+
+if [[ ! -d $GF_APP_NAME ]]; then
+    git clone $GF_APP_REPO $GF_APP_NAME
+fi
+cd $GF_APP_NAME
+mvn clean package
+cd target
+cf push $GF_APP_NAME -p $GF_APP_NAME-1.0.0-SNAPSHOT.war --no-start
+cf bind-service $GF_APP_NAME $GF_SERVICE_NAME
+cf push $GF_APP_NAME -p $GF_APP_NAME-1.0.0-SNAPSHOT.war -b https://github.com/jcherng-pivotal/java-buildpack
