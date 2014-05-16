@@ -9,5 +9,5 @@ set -x # show commands being run
 echo creating GemFire service ...
 echo
 
-cf create-service pivotal-gemfire 1GB-replicated pivotal-gemfire-1
+cf create-service pivotal-gemfire 1GB-replicated $GF_SERVICE_NAME
 cf curl /v2/service_plans/$GUID -X 'GET'

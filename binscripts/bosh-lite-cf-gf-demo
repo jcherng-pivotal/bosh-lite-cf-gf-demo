@@ -10,46 +10,38 @@
 
 set +x
 
+#needed by multiple sub-scripts
+export WORKSPACE_DIR=${WORKSPACE_DIR:-$HOME/bosh-lite-tutorial}
+export SCRIPT_PATH=${SCRIPT_PATH:-$( cd $(dirname $0) ; pwd -P )}
+export BLOB_PATH=${BLOB_PATH:-$SCRIPT_PATH/../blobs}
+
 ##
 ## Dependency locations
 ##
 
-export SCRIPT_PATH=${SCRIPT_PATH:-$( cd $(dirname $0) ; pwd -P )}
-export BLOB_PATH=${BLOB_PATH:-$SCRIPT_PATH/../blobs}
+BOSH_LITE_REPO=${BOSH_LITE_REPO:-https://github.com/cloudfoundry/bosh-lite.git}
+CF_RELEASE_REPO=${CF_RELEASE_REPO:-https://github.com/cloudfoundry/cf-release.git}
+CF_BROKERS_REPO=${CF_BROKERS_REPO:-https://github.com/jcherng-pivotal/cloudfoundry-brokers.git}
+GF_BOSH_RELEASE_REPO=${GEMFIRE_BOSH_RELEASE_REPO:-https://github.com/jcherng-pivotal/gemfire-bosh-release.git}
+GF_SERVICE_BROKER_REPO=${GEMFIRE_BOSH_RELEASE_REPO:-https://github.com/jcherng-pivotal/cloudfoundry-brokers.git}
 
-export BOSH_LITE_REPO=${BOSH_LITE_REPO:-https://github.com/cloudfoundry/bosh-lite.git}
-export CF_RELEASE_REPO=${CF_RELEASE_REPO:-https://github.com/cloudfoundry/cf-release.git}
-export CF_BROKERS_REPO=${CF_BROKERS_REPO:-https://github.com/jcherng-pivotal/cloudfoundry-brokers.git}
-export GF_BOSH_RELEASE_REPO=${GEMFIRE_BOSH_RELEASE_REPO:-https://github.com/jcherng-pivotal/gemfire-bosh-release.git}
-export GF_SERVICE_BROKER_REPO=${GEMFIRE_BOSH_RELEASE_REPO:-https://github.com/jcherng-pivotal/cloudfoundry-brokers.git}
+STEMCELL_NAME=${STEMCELL_NAME:-bosh-stemcell-24-warden-boshlite-ubuntu.tgz}
 
-export STEMCELL_NAME=${STEMCELL_NAME:-bosh-stemcell-24-warden-boshlite-ubuntu.tgz}
+CF_PROJECT_NAME=cf-release
+CF_RELEASE_NAME=cf
+CF_RELEASE_DIR=$WORKSPACE_DIR/$CF_PROJECT_NAME
+CF_RELEASE_VERSION=${CF_RELEASE_VERSION:-164}
+CF_FINAL_RELEASE_TGZ=$CF_RELEASE_DIR/releases/$CF_RELEASE_NAME-$CF_RELEASE_VERSION.tgz
 
-export WORKSPACE_DIR=${WORKSPACE_DIR:-$HOME/bosh-lite-tutorial}
-export CF_PROJECT_NAME=cf-release
-export CF_RELEASE_NAME=cf
-export CF_RELEASE_DIR=$WORKSPACE_DIR/$CF_PROJECT_NAME
-export CF_RELEASE_VERSION=${CF_RELEASE_VERSION:-164}
-export CF_FINAL_RELEASE_TGZ=$CF_RELEASE_DIR/releases/$CF_RELEASE_NAME-$CF_RELEASE_VERSION.tgz
+GF_BOSH_PROJECT_NAME=gemfire-bosh-release
+GF_BOSH_RELEASE_NAME=cf-gemfire
+GF_BOSH_RELEASE_DIR=$WORKSPACE_DIR/$GF_BOSH_PROJECT_NAME
+GF_BOSH_DEV_RELEASE_VERSION=${GF_BOSH_RELEASE_VERSION:-0.1-dev}
+GF_BOSH_DEV_RELEASE_TGZ=$GF_BOSH_RELEASE_DIR/dev_releases/$GF_BOSH_RELEASE_NAME-$GF_BOSH_DEV_RELEASE_VERSION.tgz
 
-export GF_BOSH_PROJECT_NAME=gemfire-bosh-release
-export GF_BOSH_RELEASE_NAME=cf-gemfire
-export GF_BOSH_RELEASE_DIR=$WORKSPACE_DIR/$GF_BOSH_PROJECT_NAME
-export GF_BOSH_DEV_RELEASE_VERSION=${GF_BOSH_RELEASE_VERSION:-0.1-dev}
-export GF_BOSH_DEV_RELEASE_TGZ=$GF_BOSH_RELEASE_DIR/dev_releases/$GF_BOSH_RELEASE_NAME-$GF_BOSH_DEV_RELEASE_VERSION.tgz
-
-export GF_SERVICE_BROKER_PROJECT_NAME=cloudfoundry-brokers
-export GF_SERVICE_BROKER_DIR=$WORKSPACE_DIR/$GF_SERVICE_BROKER_PROJECT_NAME
-export GF_SERVICE_BROKER_TGZ=$GF_SERVICE_BROKER_DIR/target/cf-brokers.tar.gz
-
-export APP_REPO=${APPLICATION_URL:-https://github.com/cloudfoundry-community/cf-env.git}
-export APP_NAME=${APPLICATION_NAME:-cf-env}
-
-export GF_APP_REPO=${APPLICATION_URL:-https://github.com/bijukunjummen/sample-pso-cf-app.git}
-export GF_APP_NAME=${APPLICATION_NAME:-sample-pso-cf-app}
-
-export GF_SERVICE_NAME=pivotal-gemfire-1
-
+GF_SERVICE_BROKER_PROJECT_NAME=cloudfoundry-brokers
+GF_SERVICE_BROKER_DIR=$WORKSPACE_DIR/$GF_SERVICE_BROKER_PROJECT_NAME
+GF_SERVICE_BROKER_TGZ=$GF_SERVICE_BROKER_DIR/target/cf-brokers.tar.gz
 
 ##
 ## Verify local requirements
@@ -197,7 +189,9 @@ set -e # exit on error
 
 ##
 ## Deploy Cloud Foundry and GemFire into BOSH (bosh-lite)
-## 
+##
+export CF_RELEASE_DIR=${CF_RELEASE_DIR}
+export GF_BOSH_RELEASE_DIR=${GF_BOSH_RELEASE_DIR}
 source $SCRIPT_PATH/deploy_cf_gf
 
 ##
@@ -209,18 +203,16 @@ source $SCRIPT_PATH/configure_cf
 ## Create GemFire service broker and GemFire service
 ##
 source $SCRIPT_PATH/create_gemfire_service_broker
-source $SCRIPT_PATH/create_gemfire_service
 
-##
-## Deploy sample application with default buildpack and bind Pivotal GemFire service
-##
-source $SCRIPT_PATH/push_app_with_default_buildpack
+# Needed by create_gemfire_service and push_app
+export GF_SERVICE_NAME=pivotal-gemfire-1
+source $SCRIPT_PATH/create_gemfire_service
 
 ##
 ## Deploy GemFire CF example application with GemFire session enabled buildpack,
 ## also bind the application with Pivotal GemFire service.
 ##
-source $SCRIPT_PATH/push_app_with_gemfire_module_buildpack
+source $SCRIPT_PATH/push_app
 
 bosh cck
 bosh status

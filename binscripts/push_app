@@ -3,6 +3,9 @@
 set -e # exit on error
 set -x # show commands being run
 
+export GF_APP_REPO=${APPLICATION_URL:-https://github.com/bijukunjummen/sample-pso-cf-app.git}
+export GF_APP_NAME=${APPLICATION_NAME:-sample-pso-cf-app}
+
 ##
 ## Deploy application with GemFire session enabled buildpack,
 ## also bind the application with Pivotal GemFire service.
