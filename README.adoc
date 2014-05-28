@@ -1,0 +1,77 @@
+== Quick way to bootstrap bosh-lite, Cloud Foundry, Gemfire, Gemfire Service Broker
+
+This project includes an easy-to-run command that does everything to deploy:
+
+* https://github.com/cloudfoundry/bosh-lite[Bosh-Lite]
+* https://github.com/jcherng-pivotal/gemfire-bosh-release[Bosh release of Gemfire service]
+* https://github.com/jcherng-pivotal/cloudfoundry-brokers[Gemfire Service Broker]
+* https://github.com/bijukunjummen/sample-pso-cf-app.git[Sample application] utilizing a https://github.com/jcherng-pivotal/java-buildpack.git[customized Java buildpack] to make use of Gemfire as a HttpSession store
+
+=== Pre-Requisites
+
+The following are the pre-requisites for bosh-lite:
+
+* Vagrant/Virtualbox 1.4+ - for booting the bosh-lite virtual machine on your laptop
+* Ruby 1.9.3 - for the BOSH CLI
+
+The installer script uses the following to get some assets:
+
+* wget
+* git
+
+The following are needed to deploy Cloud Foundry and then talk to Cloud Foundry as an administrator/user:
+
+* spiff - used to construct a large YAML file used to deploy BOSH releases
+* cf - Cloud Foundry's own CLI for users and admins
+
+The installer script also uses the following to compile sample applications:
+
+* maven
+
+The project has dependencies on third party licensed binary files. You will have to download the following files separately:
+
+* http://www.oracle.com/technetwork/java/javase/downloads/jdk7-downloads-1880260.html[jdk7 - Linux 64 tgz version]
+- Rename the tgz file to jdk-7-linux-x64.tar.gz and place it under bosh-lite-cf-gf-demo/blobs/java folder
+* https://network.gopivotal.com/products/pivotal-gemfire[Pivotal GemFire]
+   - Rename the zip file to Pivotal_GemFire_7.zip and place it under bosh-lite-cf-gf-demo/blobs/gemfire folder
+
+The installer script will test for the existence of these requirements. It's currently not clever enough to check for versions, so you will be prompted to confirm you have the right versions.
+
+
+=== Quick Start
+
+. Clone a copy of bosh-lite-cf-gf-demo:
++
+[source,bash]
+----
+$ cd ~/workspace
+$ git clone https://github.com/jcherng-pivotal/bosh-lite-cf-gf-demo
+----
+. Run the bosh-lite-cf-gf-demo script:
++
+[source,bash]
+----
+$ cd ~/workspace/bosh-lite-cf-gf-demo
+$ binscripts/bosh-lite-cf-gf-demo
+----
+
+If the script fails for any reason, re-run it and it will skip over any previous steps that were successful.
+
+When the script is run, approximately 2.5G of content is downloaded (Vagrant box, Cloud Foundry source & dependencies, Warden image/stemcell). If you re-run the script, these assets will not be downloaded again. Also, the first time you run the installer, it will compile the source packages of Cloud Foundry one time.
+
+
+=== Shutdown & Cleanup
+Run the following command to destroy the vagrant vm holding the running components:
+
+[source,bash]
+----
+$ cd ~/bosh-lite-tutorial/bosh-lite
+$ vagrant destroy
+----
+
+To completely remove all the artifacts downloaded by the installer, run the following command:
+
+[source,bash]
+----
+$ rm -rf ~/bosh-lite-tutorial
+----
